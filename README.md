@@ -43,7 +43,7 @@ venv\Scripts\activate         # En Windows
 pip install -r requirements.txt
 ```
 ### 3. Configura las variables de entorno
-Tendrás que crear un arhivo .env con las claves APi que tiene el programa para que te funcione en el ordenador
+Tendrás que crear un arhivo .env con las claves necesarias para que funcione el programa en el ordenador
 ### 4. Ejecuta el programa
 ```bash
 python main.py
