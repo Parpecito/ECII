@@ -49,3 +49,10 @@ Tendrás que crear un arhivo .env con las claves necesarias para que funcione el
 python main.py
 ```
 ## Además vas a necesitar descargar PostgreSQL en tu ordenador para que funcione correctamente en local, llamando a la base de datos creada como viene en el backend/backend.py con su user,host, dbname y el puerto.
+host="localhost",
+    dbname='postgres',
+    user='postgres',
+    password=os.getenv("POSTGRES_PASSWORD"),
+    port=5432
+---
+Si cambias algun nombre lo tienes que cambiar en tu código (Es recomendable llamarlo de la misma forma)
