@@ -25,16 +25,9 @@ conn=db_conexion()
 
 with conn.cursor() as cur:
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS Resumenes (
-        id SERIAL PRIMARY KEY,
-        transcription TEXT,
-        summary TEXT
-    )
-    """)
-    cur.execute("""
     CREATE TABLE IF NOT EXISTS Historial_Audio (
         id SERIAL PRIMARY KEY,
-        file_path TEXT,
+        filename TEXT,
         transcription TEXT,
         summary TEXT
     )
@@ -47,38 +40,52 @@ app = FastAPI()
 
 carpeta_temporal = "temporal"
 os.makedirs(carpeta_temporal, exist_ok=True)
-model = whisper.load_model("medium")
 
 @app.post("/upload-audio/")
 async def upload_audio(file: UploadFile = File(...)):
     audio_path = os.path.join(carpeta_temporal, file.filename)
 
+
     with open(audio_path, "wb") as audio_file:
         audio_file.write(await file.read())
 
-    return{"message": "Audio subido correctamente",
-           "file_path": audio_path
+    try:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO Historial_Audio (filename) VALUES (%s) RETURNING id", (file.filename,))
+            id_audio = cur.fetchone()[0]
+            conn.commit()
+            return{
+                "message": "Audio subido correctamente",
+                "filename": file.filename,
+                "id": id_audio
+                
            }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al guardar el archivo en la base de datos: {str(e)}")
+    
 
 
 class Transcripcion(BaseModel):
-    file_path: str
+    id: int
+    filename: str
+
+model = whisper.load_model("medium")
 
 @app.post('/transcribir-audio/')
 def transcribir_audio(request: Transcripcion):
 
-    archivo = request.file_path
+    archivo = request.filename
+    archivo_final = os.path.join(carpeta_temporal, archivo)
 
-
-    if not os.path.exists(archivo):
+    if not os.path.exists(archivo_final):
         return HTTPException(status_code=400, detail="Carpeta temporal no existe")
         
-    resultado= model.transcribe(archivo)
+    resultado= model.transcribe(archivo_final)
     transcription = resultado["text"]
 
     try:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO Resumenes (transcription) VALUES (%s)", (transcription,))
+            cur.execute("UPDATE Historial_Audio SET transcription = %s WHERE id = %s", (transcription, request.id))
             conn.commit()
     except Exception as e:
         return HTTPException(status_code=400, detail=f" Error al guardar la transcripción: {str(e)}")
@@ -88,6 +95,7 @@ def transcribir_audio(request: Transcripcion):
 
 
 class Resumen(BaseModel):
+    id: int
     transcription: str
     longitud: str
 
@@ -100,8 +108,6 @@ def resumir_transcripcion(request: Resumen):
 
     API_KEY = os.getenv("MISTRAL_API_KEY")
     API_URL="https://api.mistral.ai/v1/chat/completions" #https://docs.mistral.ai/api/#tag/chat
-
-
 
     if not API_KEY:
         return HTTPException(status_code=400, detail="API KEY no encontrada")
@@ -128,7 +134,14 @@ def resumir_transcripcion(request: Resumen):
         "model": 'mistral-small-latest',
         "messages":[
             {"role":"user",
-            "content":f"Resume el siguiente texto en un parrafo: {archivo}"
+            "content": (
+                f"Quiero que leas el siguiente texto y lo resumas en un único párrafo claro y conciso."
+                f"En el resumen, destaca las ideas principales y evita repetir detalles innecesarios o ejemplos."
+                f"Utiliza un lenguaje directo, profesional y fácil de entender. "
+                f"Este resumen debe ajustarse a un máximo de {tokens} tokens, así que prioriza la información esencial.\n\n"
+                f"Texto original:\n{archivo}"
+            )
+
             }],
         "max_tokens": tokens
     }
@@ -141,7 +154,7 @@ def resumir_transcripcion(request: Resumen):
         resumen=response.json()['choices'][0]['message']['content'].strip()
         try:
             with conn.cursor() as cur:
-                cur.execute("UPDATE Resumenes SET summary=%s WHERE transcription=%s", (resumen, archivo))
+                cur.execute("UPDATE Historial_Audio  SET summary=%s WHERE id=%s", (resumen, request.id))
                 conn.commit()
         except Exception as e:
             return HTTPException(status_code=400, detail=f"Error al guardar el resumen: {str(e)}")
@@ -149,16 +162,6 @@ def resumir_transcripcion(request: Resumen):
         return {"summary": resumen}
 
 
-@app.post("/guardar-historial/")
-def guardar_historial(file_path: str, transcription: str, summary: str):
-    try:
-        with conn.cursor() as cur:
-            cur.execute("INSERT INTO Historial_Audio (file_path, transcription, summary) VALUES (%s, %s, %s)", (file_path, transcription, summary))
-            conn.commit()
-    except Exception as e:
-        return HTTPException(status_code=400, detail=f"Error al guardar el historial: {str(e)}")
-
-    return {"message": "Historial guardado correctamente"}
 
 @app.get("/historial-audios/")
 def obtener_historial():
@@ -167,7 +170,7 @@ def obtener_historial():
             cur.execute("SELECT * FROM Historial_Audio")
             historial=[{
                 "id": row[0],
-                "file_path": row[1],
+                "filename": row[1],
                 "transcription": row[2],
                 "summary": row[3] if row[3] else "No hay resumen disponible"
             } for row in cur.fetchall() 
