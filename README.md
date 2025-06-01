@@ -48,7 +48,8 @@ Tendrás que crear un arhivo .env con las claves necesarias para que funcione el
 ```bash
 python main.py
 ```
-## Además vas a necesitar descargar PostgreSQL en tu ordenador para que funcione correctamente en local, llamando a la base de datos creada como viene en el backend/backend.py con su user,host, dbname y el puerto.
+## Para que la aplicación funcione correctamente en local, necesitarás instalar PostgreSQL y crear una base de datos siguiendo estos pasos:
+
 host="localhost",
     dbname='postgres',
     user='postgres',
