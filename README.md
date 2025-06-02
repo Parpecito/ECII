@@ -43,17 +43,18 @@ venv\Scripts\activate         # En Windows
 pip install -r requirements.txt
 ```
 ### 3. Configura las variables de entorno
-Tendrás que crear un arhivo .env con las claves necesarias para que funcione el programa en el ordenador
+Tendrás que crear un arhivo .env con las claves necesarias para que funcione el programa en el ordenador (Nos encontraremos un ejemplo en env.example)
 ### 4. Ejecuta el programa
 ```bash
 python main.py
 ```
 ## Para que la aplicación funcione correctamente en local, necesitarás instalar PostgreSQL y crear una base de datos siguiendo estos pasos:
-
+```bash
 host="localhost",
     dbname='postgres',
     user='postgres',
     password=os.getenv("POSTGRES_PASSWORD"),
     port=5432
+```
 ---
 Si cambias algun nombre lo tienes que cambiar en tu código (Es recomendable llamarlo de la misma forma)
